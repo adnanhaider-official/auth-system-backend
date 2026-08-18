@@ -2,6 +2,7 @@ import asyncHandler from "../utils/asyncHandler.js";
 import ApiError from "../utils/ApiError.js";
 import ApiResponse from "../utils/ApiResponse.js";
 import { User } from "../models/user.model.js";
+import jwt from "jsonwebtoken";
 
 // Register User
 const registerUser = asyncHandler(async (req, res) => {
@@ -138,4 +139,52 @@ const getCurrentUser = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, req.user, "User Fetch Successfully"));
 });
 
-export { registerUser, loginUser, logoutUser, getCurrentUser };
+// refresh Access Token
+const refreshAccessToken = asyncHandler(async (req, res) => {
+  // Get refresh token from cookie
+  const token = req.cookies?.refreshToken || req.body.refreshToken;
+
+  // Check refresh token
+  if (!token) {
+    throw new ApiError(401, "Unauthorized");
+  }
+
+  // Verify refresh token
+  const decodedToken = jwt.verify(token, process.env.REFRESH_TOKEN_SECRET);
+
+  // Find user using token ke andar wali _id
+  const user = await User.findById(decodedToken._id);
+
+  if (!user) {
+    throw new ApiError(404, "User not found");
+  }
+
+  // Check whether refresh token database
+  // wale refresh token ke saath match karta hai
+  if (token !== user.refreshToken) {
+    throw new ApiError(401, "Invalid refresh token");
+  }
+
+  // Generate new access token
+  const accessToken = user.generateAccessToken();
+
+  // Cookie options
+  const options = {
+    httpOnly: true,
+    secure: false, // localhost
+  };
+
+  // Send new access token
+  return res
+    .status(200)
+    .cookie("accessToken", accessToken, options)
+    .json(new ApiResponse(200, null, "Access token refreshed successfully"));
+});
+
+export {
+  registerUser,
+  loginUser,
+  logoutUser,
+  getCurrentUser,
+  refreshAccessToken,
+};
