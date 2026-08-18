@@ -182,6 +182,7 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, null, "Access token refreshed successfully"));
 });
 
+// Change Password
 const changePassword = asyncHandler(async (req, res) => {
   // Get passwords from request body
   const { oldPassword, newPassword, confirmNewPassword } = req.body;
@@ -222,6 +223,7 @@ const changePassword = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, null, "Password changed successfully"));
 });
 
+// Forget Password
 const forgotPassword = asyncHandler(async (req, res) => {
   // Get email from request body
   const { email } = req.body;
@@ -274,6 +276,7 @@ const forgotPassword = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, null, "Password reset link sent to your email"));
 });
 
+// Reset Password
 const resetPassword = asyncHandler(async (req, res) => {
   // Get reset token from query parameter
   const { token } = req.query;
@@ -321,6 +324,98 @@ const resetPassword = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, null, "Password reset successfully"));
 });
 
+// send EmailVerification
+const sendVerificationEmail = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+
+  if (!email) {
+    throw new ApiError(400, "Email is required");
+  }
+
+  const user = await User.findOne({ email });
+
+  if (!user) {
+    throw new ApiError(404, "User not found");
+  }
+
+  if (user.isEmailVerified) {
+    throw new ApiError(400, "Email is already verified");
+  }
+
+  const verificationToken = crypto.randomBytes(32).toString("hex");
+  const emailVerificationExpiry = Date.now() + 10 * 60 * 1000;
+
+  user.emailVerificationToken = verificationToken;
+  user.emailVerificationExpiry = emailVerificationExpiry;
+
+  await user.save({
+    validateBeforeSave: false,
+  });
+
+  const verifyLink = `http://localhost:5173/verify-email?token=${verificationToken}`;
+
+  await sendEmail({
+    to: user.email,
+    subject: "Verify Your Email",
+    html: `
+        <h2>Verify Your Email</h2>
+
+        <p>
+            Please click the link below to verify your email.
+        </p>
+
+        <a href="${verifyLink}">
+            Verify Email
+        </a>
+
+        <p>This link will expire in 10 minutes.</p>
+    `,
+  });
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, null, "Verification email sent successfully"));
+});
+
+// verify Email
+const verifyEmail = asyncHandler(async (req, res) => {
+  // Get verification token from URL
+  const { token } = req.query;
+
+  // Check token
+  if (!token) {
+    throw new ApiError(400, "Verification token is required");
+  }
+
+  // Find user using token and check token expiry
+  const user = await User.findOne({
+    emailVerificationToken: token,
+    emailVerificationExpiry: {
+      $gt: Date.now(),
+    },
+  });
+
+  // Check token
+  if (!user) {
+    throw new ApiError(400, "Invalid or expired verification token");
+  }
+
+  // Verify email
+  user.isEmailVerified = true;
+
+  // Remove verification token
+  user.emailVerificationToken = null;
+  user.emailVerificationExpiry = null;
+
+  // Save changes
+  await user.save();
+
+  // Response
+  return res
+    .status(200)
+    .json(new ApiResponse(200, null, "Email verified successfully"));
+});
+
 export {
   registerUser,
   loginUser,
@@ -330,4 +425,6 @@ export {
   changePassword,
   forgotPassword,
   resetPassword,
+  sendVerificationEmail,
+  verifyEmail,
 };
