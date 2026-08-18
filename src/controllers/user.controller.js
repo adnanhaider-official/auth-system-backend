@@ -274,6 +274,53 @@ const forgotPassword = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, null, "Password reset link sent to your email"));
 });
 
+const resetPassword = asyncHandler(async (req, res) => {
+  // Get reset token from query parameter
+  const { token } = req.query;
+
+  // Get new passwords from request body
+  const { newPassword, confirmNewPassword } = req.body;
+
+  // Check passwords
+  if (!newPassword || !confirmNewPassword) {
+    throw new ApiError(400, "New password and confirm password are required");
+  }
+
+  // Check password confirmation
+  if (newPassword !== confirmNewPassword) {
+    throw new ApiError(400, "New and confirm password do not match");
+  }
+
+  // Find user using reset token
+  // and check that token has not expired
+  const user = await User.findOne({
+    passwordResetToken: token,
+    passwordResetExpiry: {
+      $gt: Date.now(),
+    },
+  });
+
+  // Check token
+  if (!user) {
+    throw new ApiError(400, "Invalid or expired reset token");
+  }
+
+  // Set new password
+  user.password = newPassword;
+
+  // Remove reset token so it cannot be reused
+  user.passwordResetToken = null;
+  user.passwordResetExpiry = null;
+
+  // Save user
+  // pre("save") will hash the new password
+  await user.save();
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, null, "Password reset successfully"));
+});
+
 export {
   registerUser,
   loginUser,
@@ -282,4 +329,5 @@ export {
   refreshAccessToken,
   changePassword,
   forgotPassword,
+  resetPassword,
 };
