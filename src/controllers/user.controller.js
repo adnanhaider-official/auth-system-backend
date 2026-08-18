@@ -5,6 +5,14 @@ import { User } from "../models/user.model.js";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import sendEmail from "../utils/sendEmail.js";
+import { OAuth2Client } from "google-auth-library";
+
+const googleClient = new OAuth2Client(
+  process.env.GOOGLE_CLIENT_ID,
+  process.env.GOOGLE_CLIENT_SECRET,
+  process.env.GOOGLE_CALLBACK_URL
+);
+
 // Register User
 const registerUser = asyncHandler(async (req, res) => {
   // Get user data
@@ -342,9 +350,13 @@ const sendVerificationEmail = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Email is already verified");
   }
 
+  // Generate verification token
   const verificationToken = crypto.randomBytes(32).toString("hex");
+
+  // Token expires after 10 minutes
   const emailVerificationExpiry = Date.now() + 10 * 60 * 1000;
 
+  // Save token and expiry
   user.emailVerificationToken = verificationToken;
   user.emailVerificationExpiry = emailVerificationExpiry;
 
@@ -352,24 +364,28 @@ const sendVerificationEmail = asyncHandler(async (req, res) => {
     validateBeforeSave: false,
   });
 
+  // Create verification link
   const verifyLink = `http://localhost:5173/verify-email?token=${verificationToken}`;
 
+  // Send verification email
   await sendEmail({
     to: user.email,
     subject: "Verify Your Email",
     html: `
-        <h2>Verify Your Email</h2>
+            <h2>Verify Your Email</h2>
 
-        <p>
-            Please click the link below to verify your email.
-        </p>
+            <p>
+                Please click the link below to verify your email.
+            </p>
 
-        <a href="${verifyLink}">
-            Verify Email
-        </a>
+            <a href="${verifyLink}">
+                Verify Email
+            </a>
 
-        <p>This link will expire in 10 minutes.</p>
-    `,
+            <p>
+                This link will expire in 10 minutes.
+            </p>
+        `,
   });
 
   return res
@@ -416,6 +432,90 @@ const verifyEmail = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, null, "Email verified successfully"));
 });
 
+// google login
+const googleLogin = asyncHandler(async (req, res) => {
+  const authUrl = googleClient.generateAuthUrl({
+    access_type: "offline",
+    scope: ["openid", "profile", "email"],
+    prompt: "consent",
+  });
+
+  return res.redirect(authUrl);
+});
+
+// google Callback url
+const googleCallback = asyncHandler(async (req, res) => {
+  // Get authorization code from Google
+  const { code } = req.query;
+
+  if (!code) {
+    throw new ApiError(400, "Google authorization code is missing");
+  }
+
+  // Exchange code for Google tokens
+  const { tokens } = await googleClient.getToken({
+    code,
+    redirect_uri: process.env.GOOGLE_CALLBACK_URL,
+  });
+
+  // Get Google ID token
+  const { id_token } = tokens;
+
+  // Verify Google ID token
+  const ticket = await googleClient.verifyIdToken({
+    idToken: id_token,
+    audience: process.env.GOOGLE_CLIENT_ID,
+  });
+
+  // Get Google user information
+  const payload = ticket.getPayload();
+
+  const { sub, email, name, email_verified } = payload;
+
+  // Find existing user
+  const existingUser = await User.findOne({
+    email,
+  });
+
+  let user = existingUser;
+
+  // Create user if not found
+  if (!user) {
+    user = await User.create({
+      fullname: name,
+      email,
+      username: email.split("@")[0],
+      googleId: sub,
+      authProvider: "google",
+      isEmailVerified: email_verified,
+    });
+  }
+
+  // Generate application tokens
+  const accessToken = user.generateAccessToken();
+  const refreshToken = user.generateRefreshToken();
+
+  // Save refresh token
+  user.refreshToken = refreshToken;
+
+  await user.save({
+    validateBeforeSave: false,
+  });
+
+  // Cookie options
+  const options = {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+  };
+
+  // Send response
+  return res
+    .status(200)
+    .cookie("accessToken", accessToken, options)
+    .cookie("refreshToken", refreshToken, options)
+    .json(new ApiResponse(200, user, "Google login successful"));
+});
+
 export {
   registerUser,
   loginUser,
@@ -427,4 +527,6 @@ export {
   resetPassword,
   sendVerificationEmail,
   verifyEmail,
+  googleLogin,
+  googleCallback,
 };

@@ -10,6 +10,8 @@ import {
   resetPassword,
   sendVerificationEmail,
   verifyEmail,
+  googleLogin,
+  googleCallback,
 } from "../controllers/user.controller.js";
 
 import verifyJwt from "../middlewares/auth.middleware.js";
@@ -35,5 +37,9 @@ router.post("/reset-password", resetPassword);
 router.post("/send-verification-email", sendVerificationEmail);
 
 router.get("/verify-email", verifyEmail);
+
+router.get("/google", googleLogin);
+
+router.get("/google/callback", googleCallback);
 
 export default router;
