@@ -181,10 +181,51 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, null, "Access token refreshed successfully"));
 });
 
+const changePassword = asyncHandler(async (req, res) => {
+  // Get passwords from request body
+  const { oldPassword, newPassword, confirmNewPassword } = req.body;
+
+  // Check required fields
+  if (!oldPassword || !newPassword || !confirmNewPassword) {
+    throw new ApiError(400, "All password fields are required");
+  }
+
+  // Check new password confirmation
+  if (newPassword !== confirmNewPassword) {
+    throw new ApiError(400, "New and confirm password do not match");
+  }
+
+  // Find current logged-in user
+  const user = await User.findById(req.user._id);
+
+  if (!user) {
+    throw new ApiError(404, "User not found");
+  }
+
+  // Check old password
+  const isPasswordMatched = await user.isPasswordCorrect(oldPassword);
+
+  if (!isPasswordMatched) {
+    throw new ApiError(400, "Old password is incorrect");
+  }
+
+  // Set new password
+  user.password = newPassword;
+
+  // Save user
+  // pre("save") automatically hashes the new password
+  await user.save();
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, null, "Password changed successfully"));
+});
+
 export {
   registerUser,
   loginUser,
   logoutUser,
   getCurrentUser,
   refreshAccessToken,
+  changePassword,
 };
