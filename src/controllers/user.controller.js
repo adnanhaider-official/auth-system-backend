@@ -177,6 +177,16 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
   // Generate new access token
   const accessToken = user.generateAccessToken();
 
+  // Generate new refreshToken token
+  const refreshToken = user.generateRefreshToken();
+
+  // Add new refreshToken in db
+  user.refreshToken = refreshToken;
+
+  await user.save({
+    validateBeforeSave: false,
+  });
+
   // Cookie options
   const options = {
     httpOnly: true,
@@ -187,6 +197,7 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
   return res
     .status(200)
     .cookie("accessToken", accessToken, options)
+    .cookie("refreshToken", refreshToken, options)
     .json(new ApiResponse(200, null, "Access token refreshed successfully"));
 });
 
