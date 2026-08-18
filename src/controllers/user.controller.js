@@ -3,7 +3,8 @@ import ApiError from "../utils/ApiError.js";
 import ApiResponse from "../utils/ApiResponse.js";
 import { User } from "../models/user.model.js";
 import jwt from "jsonwebtoken";
-
+import crypto from "crypto";
+import sendEmail from "../utils/sendEmail.js";
 // Register User
 const registerUser = asyncHandler(async (req, res) => {
   // Get user data
@@ -221,6 +222,58 @@ const changePassword = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, null, "Password changed successfully"));
 });
 
+const forgotPassword = asyncHandler(async (req, res) => {
+  // Get email from request body
+  const { email } = req.body;
+
+  // Check email
+  if (!email) {
+    throw new ApiError(400, "Email is required");
+  }
+
+  // Find user
+  const user = await User.findOne({ email });
+
+  if (!user) {
+    throw new ApiError(404, "User not found");
+  }
+
+  // Generate reset token
+  const resetToken = crypto.randomBytes(32).toString("hex");
+
+  // Save reset token and expiry in database
+  user.passwordResetToken = resetToken;
+  user.passwordResetExpiry = Date.now() + 10 * 60 * 1000;
+
+  await user.save();
+
+  // Create reset password link
+  const resetLink = `http://localhost:5173/reset-password?token=${resetToken}`;
+
+  // Send reset password email
+  await sendEmail({
+    to: user.email,
+    subject: "Reset Password",
+    html: `
+            <h2>Reset Your Password</h2>
+
+            <p>
+                Click the button below to reset your password.
+                This link will expire in 10 minutes.
+            </p>
+
+            <a href="${resetLink}">
+                Reset Password
+            </a>
+        `,
+  });
+
+  // Send success response
+  return res
+    .status(200)
+    .json(new ApiResponse(200, null, "Password reset link sent to your email"));
+});
+
 export {
   registerUser,
   loginUser,
@@ -228,4 +281,5 @@ export {
   getCurrentUser,
   refreshAccessToken,
   changePassword,
+  forgotPassword,
 };
