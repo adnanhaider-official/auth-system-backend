@@ -1,12 +1,15 @@
 import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
+import helmet from "helmet";
 import userRoutes from "./routes/user.routes.js";
 import errorHandler from "./middlewares/ErrorHandler.js";
 
 const app = express();
 
 // Middleware
+app.use(helmet());
+
 app.use(
   cors({
     origin: process.env.CORS_ORIGIN,
