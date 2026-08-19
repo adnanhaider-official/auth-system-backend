@@ -20,7 +20,11 @@ import verifyJwt from "../middlewares/auth.middleware.js";
 import { loginLimiter } from "../middlewares/rateLimiter.js";
 
 import { emailActionLimiter } from "../middlewares/rateLimiter.js";
-import { verifyCsrfToken } from "../middlewares/csrf.js";
+
+// Manual Csrf Token Middlware
+// import { verifyCsrfToken } from "../middlewares/csrf.js";
+
+import { doubleCsrfProtection } from "../middlewares/csrf.js";
 
 const router = Router();
 
@@ -28,13 +32,24 @@ router.post("/register", registerUser);
 
 router.post("/login", loginLimiter, loginUser);
 
-router.post("/logout", verifyJwt, verifyCsrfToken, logoutUser);
+router.post("/logout", verifyJwt, doubleCsrfProtection, logoutUser);
+
+// Manual Csrf Routes
+// router.post("/logout", verifyJwt, verifyCsrfToken, logoutUser);
 
 router.get("/profile", verifyJwt, getCurrentUser);
 
 router.post("/refresh-token", refreshAccessToken);
 
-router.post("/change-password", verifyJwt, verifyCsrfToken, changePassword);
+router.post(
+  "/change-password",
+  verifyJwt,
+  doubleCsrfProtection,
+  changePassword
+);
+
+// Manual Csrf Routes
+// router.post("/change-password", verifyJwt, verifyCsrfToken, changePassword);
 
 router.post("/forget-password", emailActionLimiter, forgotPassword);
 

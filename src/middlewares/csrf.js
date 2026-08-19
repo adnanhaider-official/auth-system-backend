@@ -1,19 +1,43 @@
-import ApiError from "../utils/ApiError.js";
+import { doubleCsrf } from "csrf-csrf";
 
-const verifyCsrfToken = (req, res, next) => {
-  const cookieToken = req.cookies?.csrfToken;
+const { generateCsrfToken, doubleCsrfProtection } = doubleCsrf({
+  getSecret: () => process.env.CSRF_SECRET,
 
-  const headerToken = req.headers["x-csrf-token"];
+  getSessionIdentifier: (req) => req.cookies?.accessToken || "anonymous",
 
-  if (!cookieToken || !headerToken) {
-    throw new ApiError(400, "Csrf Token is missing..");
-  }
+  cookieName: "csrfToken",
 
-  if (cookieToken !== headerToken) {
-    throw new ApiError(403, "Invalid CSRF token");
-  }
+  cookieOptions: {
+    httpOnly: false,
+    secure: false,
+    sameSite: "strict",
+  },
 
-  next();
-};
+  size: 64,
 
-export { verifyCsrfToken };
+  ignoredMethods: ["GET", "HEAD", "OPTIONS"],
+});
+
+export { generateCsrfToken, doubleCsrfProtection };
+
+// Manual Csrf Middleware
+
+// import ApiError from "../utils/ApiError.js";
+
+// const verifyCsrfToken = (req, res, next) => {
+//   const cookieToken = req.cookies?.csrfToken;
+
+//   const headerToken = req.headers["x-csrf-token"];
+
+//   if (!cookieToken || !headerToken) {
+//     throw new ApiError(400, "Csrf Token is missing..");
+//   }
+
+//   if (cookieToken !== headerToken) {
+//     throw new ApiError(403, "Invalid CSRF token");
+//   }
+
+//   next();
+// };
+
+// export { verifyCsrfToken };

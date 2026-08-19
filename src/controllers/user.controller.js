@@ -6,6 +6,7 @@ import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import sendEmail from "../utils/sendEmail.js";
 import { OAuth2Client } from "google-auth-library";
+import { generateCsrfToken } from "../middlewares/csrf.js";
 
 const googleClient = new OAuth2Client(
   process.env.GOOGLE_CLIENT_ID,
@@ -534,20 +535,28 @@ const googleCallback = asyncHandler(async (req, res) => {
 });
 
 // Manual CSRF
-const getCsrfToken = (req, res) => {
-  const csrfToken = crypto.randomBytes(32).toString("hex");
+// const getCsrfToken = (req, res) => {
+//   const csrfToken = crypto.randomBytes(32).toString("hex");
 
-  const options = {
-    httpOnly: false,
-    secure: false, // localhost
-    sameSite: "strict",
-  };
+//   const options = {
+//     httpOnly: false,
+//     secure: false, // localhost
+//     sameSite: "strict",
+//   };
+
+//   return res
+//     .status(200)
+//     .cookie("csrfToken", csrfToken, options)
+//     .json(new ApiResponse(200, csrfToken, "CSRF Token generate Successfully"));
+// };
+
+const getCsrfToken = asyncHandler((req, res) => {
+  const csrfToken = generateCsrfToken(req, res);
 
   return res
     .status(200)
-    .cookie("csrfToken", csrfToken, options)
-    .json(new ApiResponse(200, csrfToken, "CSRF Token generate Successfully"));
-};
+    .json(new ApiResponse(200, csrfToken, "CSRF Token generated successfully"));
+});
 
 export {
   registerUser,
