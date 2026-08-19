@@ -18,6 +18,8 @@ import verifyJwt from "../middlewares/auth.middleware.js";
 
 import { loginLimiter } from "../middlewares/rateLimiter.js";
 
+import { emailActionLimiter } from "../middlewares/rateLimiter.js";
+
 const router = Router();
 
 router.post("/register", registerUser);
@@ -32,11 +34,15 @@ router.post("/refresh-token", refreshAccessToken);
 
 router.post("/change-password", verifyJwt, changePassword);
 
-router.post("/forget-password", forgotPassword);
+router.post("/forget-password", emailActionLimiter, forgotPassword);
 
 router.post("/reset-password", resetPassword);
 
-router.post("/send-verification-email", sendVerificationEmail);
+router.post(
+  "/send-verification-email",
+  emailActionLimiter,
+  sendVerificationEmail
+);
 
 router.get("/verify-email", verifyEmail);
 
