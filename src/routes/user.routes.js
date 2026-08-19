@@ -26,11 +26,21 @@ import { emailActionLimiter } from "../middlewares/rateLimiter.js";
 
 import { doubleCsrfProtection } from "../middlewares/csrf.js";
 
+import { validate } from "../middlewares/validate.js";
+
+import {
+  registerSchema,
+  loginSchema,
+  forgotPasswordSchema,
+  resetPasswordSchema,
+  changePasswordSchema,
+} from "../validators/user.validator.js";
+
 const router = Router();
 
-router.post("/register", registerUser);
+router.post("/register", validate(registerSchema), registerUser);
 
-router.post("/login", loginLimiter, loginUser);
+router.post("/login", loginLimiter, validate(loginSchema), loginUser);
 
 router.post("/logout", verifyJwt, doubleCsrfProtection, logoutUser);
 
@@ -45,15 +55,21 @@ router.post(
   "/change-password",
   verifyJwt,
   doubleCsrfProtection,
+  validate(changePasswordSchema),
   changePassword
 );
 
 // Manual Csrf Routes
 // router.post("/change-password", verifyJwt, verifyCsrfToken, changePassword);
 
-router.post("/forget-password", emailActionLimiter, forgotPassword);
+router.post(
+  "/forget-password",
+  emailActionLimiter,
+  validate(forgotPasswordSchema),
+  forgotPassword
+);
 
-router.post("/reset-password", resetPassword);
+router.post("/reset-password", validate(resetPasswordSchema), resetPassword);
 
 router.post(
   "/send-verification-email",
