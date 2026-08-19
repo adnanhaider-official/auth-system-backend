@@ -16,11 +16,13 @@ import {
 
 import verifyJwt from "../middlewares/auth.middleware.js";
 
+import { loginLimiter } from "../middlewares/rateLimiter.js";
+
 const router = Router();
 
 router.post("/register", registerUser);
 
-router.post("/login", loginUser);
+router.post("/login", loginLimiter, loginUser);
 
 router.post("/logout", verifyJwt, logoutUser);
 
